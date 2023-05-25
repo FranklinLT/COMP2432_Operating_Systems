@@ -1,0 +1,205 @@
+#!/bin/bash
+
+flag=0
+class=() | count1=0
+student=() | count2=0
+student1=() | count3=0
+output=() | count4=0
+
+function get_info(){
+    while read line || [[ -n ${line} ]]
+    do
+        strA="$line"
+        if [[ $strA =~ $1 ]]; then
+            strC=${class[$2]%.*}
+            strC1=${strC:0:8}
+            strC2=${strC:8:2}
+            strC3=${strC:11:1}
+            strC2="-20$strC2"
+            strC3="-$strC3 "
+            strC4=${strA:5}
+            strC5=$strC1$strC2$strC3$strC4
+
+            output[$count4]=$strC5
+            let count4++    
+        fi
+    done < ${class[$2]}
+}
+
+function GPA_calculate(){
+    length=${#output[@]}
+    if [ $length -eq 1 ]; then
+        re="This student didn't take any class"
+        output[$count4]=$re
+        let count4++
+        return 1
+    fi
+
+    gpa_class=() | count5=0
+    tail=${#output[@]}
+    let last=$tail-1
+    for ((k=1;k<$tail;k++))
+    do
+        if [ $k -ne $last ]; then
+            let n=$k+1
+            name1=${output[k]:4:4}
+            name2=${output[n]:4:4}
+            
+            if [ $name1 -eq $name2 ]; then
+                continue
+            fi
+        fi
+
+        length=${#output[k]}
+        if [ $length -eq 16 ]; then
+            continue
+        fi
+        gpa_class[$count5]=${output[k]}
+        let count5++
+    done
+
+    sum=0
+    valid=0
+    for ((j=0;j<${#gpa_class[@]};j++))
+    do
+        letter=${gpa_class[j]:16:1}
+        length=${#gpa_class[j]}
+        #echo $length
+        if [ $length -eq 18 ]; then
+            sign=${gpa_class[j]:17:1}
+        else
+            sign="!"
+        fi
+
+        #echo $letter
+        #echo $sign
+
+        grade=0
+        case $letter in
+            A) let grade=$grade+400
+            ;;
+            B) let grade=$grade+300
+            ;;
+            C) let grade=$grade+200
+            ;;
+            D) let grade=$grade+100
+            ;;
+            F) let grade=$grade+0
+            ;;
+            *) echo "The grade is wrong!"
+            ;;
+        esac
+    
+        case $sign in
+            +) let grade=$grade+30
+            ;;
+            -) let grade=$grade-30
+            ;;
+            !) 
+            ;;
+            *) 
+            ;;
+        esac
+
+        let valid++
+        let sum=$sum+$grade
+    done
+
+    unset gpa_class
+    let count5=0
+
+    let sum=$sum/$valid
+    ans="GPA for $valid valid subjects ${sum:0:1}.${sum:1:2}"
+    output[$count4]=$ans
+    let count4++
+}
+
+#save all the input in two lists
+ 
+for i in $*
+do
+    if [ $flag -eq 0 ]; then
+        class[$count1]=$i
+        let count1++  
+    else
+        student[$count2]=$i
+        let count2++
+    fi
+
+    if [ "$i" = "student" ]; then
+        flag=1
+    fi
+done
+
+count1=${#class[@]}
+let count1--
+unset class[$count1]
+
+#class=$(echo ${class[@]} | tr ' ' '\n' | sort -n)
+#echo ${student[@]}
+
+echo ${class[@]}
+
+v1=${#class[@]}
+for ((i=1;i<$v1;i++))
+do
+    let v2=$v1-$i
+    for ((p=0;p<$v2;p++))
+    do
+        let v3=$p+1
+        arg1=${class[v3]}
+        arg2=${class[p]}
+        if [[ $arg1 < $arg2 ]]; then
+            class[v3]=$arg2
+            class[p]=$arg1
+        fi
+    done
+done
+
+echo ${class[@]}
+
+for ((i=0;i<${#student[@]};i++))
+do
+    while read line || [[ -n ${line} ]]
+    do
+        flag1=$(echo $line | grep "${student[i]}")
+        if [[ "$flag1" != "" ]]; then
+            #echo $line
+            student1[$count3]=${line/" "/_}
+            let count3++
+        fi
+    done < student.dat
+done
+
+#unique
+student1=($(awk -v RS=' ' '!a[$1]++' <<< ${student1[@]}))
+
+#echo ${#student1[@]}
+
+for ((i=0;i<${#student1[@]};i++))
+do
+    #sentence 1
+    echo "------------------------------"
+    title="Transcript for ${student1[i]}"
+    output[$count4]=$title
+    let count4++
+
+    #rest sentences
+    id=${student1[i]:0:4}
+    for ((n=0;n<${#class[@]};n++))
+    do
+        get_info $id $n
+    done
+
+    #GPA compute
+    GPA_calculate
+    
+    for ((m=0;m<${#output[@]};m++))
+    do
+        echo ${output[m]}
+    done
+
+    count4=0
+    unset output
+done
+echo "------------------------------"

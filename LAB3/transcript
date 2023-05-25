@@ -1,0 +1,215 @@
+#!/bin/bash
+
+flag=0
+class=() | count1=0
+student=() | count2=0
+student1=() | count3=0
+output=() | count4=0
+
+#This function is use to get the information about the students
+function get_info(){
+    title=`head -n 1 ${class[$2]}`
+    title=`echo $title | sed 's/ *$//g' | tr -d '\r'`
+    title_info=($title)
+    tit="${title_info[1]} ${title_info[2]} ${title_info[3]} "
+    while read line || [[ -n ${line} ]]
+    do
+        strA="$line"
+        if [[ $strA =~ $1 ]]; then
+            s_info=($strA)
+            if [[ ${#s_info[@]} -eq 2 ]]; then
+                num=${s_info[1]}
+                num=`echo $num | sed 's/ *$//g' | tr -d '\r'`
+                strC="$tit$num"
+            else
+                strC="$tit"
+            fi
+            output[$count4]=$strC
+            let count4++    
+        fi
+    done < ${class[$2]}
+}
+
+#This function is use to find the valid class and add them to a list and later calculate the GPA for the student
+function GPA_calculate(){
+    length=${#output[@]}
+    if [ $length -eq 1 ]; then
+        re="This student didn't take any class"
+        output[$count4]=$re
+        let count4++
+        return 1
+    fi
+
+#add the valid calss to a array
+    gpa_class=() | count5=0
+    tail=${#output[@]}
+    let last=$tail-1
+    for ((k=1;k<$tail;k++))
+    do
+        if [ $k -ne $last ]; then
+            let n=$k+1
+            na1=(${output[k]})
+            na2=(${output[n]})
+            name1=${na1[0]}
+            name2=${na2[0]}
+            if [ $name1 = $name2 ]; then
+                next_length=${#na2[@]}
+                if [ $next_length -gt 3 ]; then
+                    continue
+                fi
+            fi
+        fi
+
+        na3=(${output[k]})
+        length=${#na3[@]}
+        if [ $length -le 3 ]; then
+            continue
+        fi
+        gpa_class[$count5]=${output[k]}
+        let count5++
+    done
+
+    sum=0
+    valid=0
+    for ((j=0;j<${#gpa_class[@]};j++))
+    do
+        na4=(${gpa_class[j]})
+        num4=${na4[3]}
+        letter=${num4:0:1}
+        if [ ${#num4} -eq 2 ]; then
+            sign=${num4:1:1}
+        else
+            sign="!"
+        fi
+
+        grade=0
+        case $letter in
+            A) let grade=$grade+400
+            ;;
+            B) let grade=$grade+300
+            ;;
+            C) let grade=$grade+200
+            ;;
+            D) let grade=$grade+100
+            ;;
+            F) let grade=$grade+0
+            ;;
+            *) echo "The grade is wrong!"
+            ;;
+        esac
+    
+        case $sign in
+            +) let grade=$grade+30
+            ;;
+            -) let grade=$grade-30
+            ;;
+            !) 
+            ;;
+            *) 
+            ;;
+        esac
+        let valid++
+        let sum=$sum+$grade
+    done
+
+    unset gpa_class
+    let count5=0
+
+    #avoid if some students did not have any valid class
+    if [ $valid -ne 0 ]; then
+        let sum=$sum/$valid
+        let int_num=$sum/100
+        let deci_num=$sum-$int_num*100
+        if [ $deci_num -ge 10 ]; then
+            ans="GPA for $valid valid subjects $int_num.$deci_num"
+        else
+            ans="GPA for $valid valid subjects $int_num.0$deci_num"
+        fi
+        output[$count4]=$ans
+        let count4++
+    fi
+}
+
+#save all the input in two lists
+for i in $*
+do
+    if [ $flag -eq 0 ]; then
+        class[$count1]=$i
+        let count1++  
+    else
+        student[$count2]=$i
+        let count2++
+    fi
+
+    if [ "$i" = "student" ]; then
+        flag=1
+    fi
+done
+
+#remove the string 'student' in the array
+count1=${#class[@]}
+let count1--
+unset class[$count1]
+
+
+#sort the class name to make them sorting from small to big
+v1=${#class[@]}
+for ((i=1;i<$v1;i++))
+do
+    let v2=$v1-$i
+    for ((p=0;p<$v2;p++))
+    do
+        let v3=$p+1
+        arg1=${class[v3]}
+        arg2=${class[p]}
+        if [[ $arg1 < $arg2 ]]; then
+            class[v3]=$arg2
+            class[p]=$arg1
+        fi
+    done
+done
+
+#Add the complete student information to the list based on the inputed student number or student name
+for ((i=0;i<${#student[@]};i++))
+do
+    while read line || [[ -n ${line} ]]
+    do
+        temp=($line)
+        sid=${temp[0]}
+        sname=`echo ${temp[1]} | sed 's/ *$//g'`
+        ssname=`echo $sname | tr -d '\r'`
+        if [[ "${student[i]}" = "$sid" || "${student[i]}" = "$ssname" ]]; then
+            student1[$count3]=${line/" "/_}
+            let count3++
+        fi
+    done < student.dat
+done
+
+
+for ((i=0;i<${#student1[@]};i++))
+do
+    #sentence 1 (the title of every output)
+    echo "------------------------------"
+    title="Transcript for ${student1[i]}"
+    output[$count4]=$title
+    let count4++
+
+    #the rest sentences
+    id=${student1[i]:0:4}
+    for ((n=0;n<${#class[@]};n++))
+    do
+        get_info $id $n
+    done
+
+    #GPA compute
+    GPA_calculate
+    
+    for ((m=0;m<${#output[@]};m++)) 
+    do
+        echo ${output[m]}
+    done
+
+    count4=0
+    unset output
+done
+echo "------------------------------"
